@@ -1,5 +1,5 @@
 import React from 'react'
-import { BrowserRouter as Router, Route, Switch } from 'react-router-dom'
+import { Router, Route, Switch } from 'react-router-dom'
 import posed, { PoseGroup } from 'react-pose'
 import Dashboard from './views/Dashboard';
 import Login from './views/Login';
@@ -7,10 +7,6 @@ import NavBar from './components/Navbar'
 import { createBrowserHistory } from 'history'
 
 const history = createBrowserHistory()
-
-history.listen((location, action) => {
-    console.log(location.pathname)
-})
 
 const RouteContainer = posed.div({
     enter:{

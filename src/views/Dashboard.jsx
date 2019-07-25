@@ -10,11 +10,18 @@ const Fields = posed.div({
     exit: { x: 50, opacity: 0 }
 })
 
+
+
 export default function Dashboard() {
+    const userName = localStorage.getItem('userName')
+
     return(
         <Container>
             <Fields>
-                <h3 className='text-white p-3'>Dashboard</h3>
+                {userName!==null ? 
+                    (<h3 className='text-white p-3'>Welcome {userName}</h3>)
+                    :
+                    (<h3 className='text-white p-3'>Dashboard</h3>)}
             </Fields>
         </Container>
     )

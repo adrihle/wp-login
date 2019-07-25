@@ -1,29 +1,22 @@
 import React from 'react';
-import { makeStyles } from '@material-ui/core/styles';
 import AppBar from '@material-ui/core/AppBar';
 import Toolbar from '@material-ui/core/Toolbar';
-import Typography from '@material-ui/core/Typography';
 import IconButton from '@material-ui/core/IconButton';
-import MenuIcon from '@material-ui/icons/Menu';
 import AccountCircle from '@material-ui/icons/AccountCircle';
 import MenuItem from '@material-ui/core/MenuItem';
 import Menu from '@material-ui/core/Menu';
 import { Link } from 'react-router-dom'
+var emitter = require('../config/global_emitter')
 
-const useStyles = makeStyles(theme => ({
-  menuButton: {
-    marginRight: theme.spacing(2),
-  },
-  title: {
-    flexGrow: 1
-  },
-}));
 
-export default function MenuAppBar() {
-  const classes = useStyles();
+export default function MenuAppBar(props) {
   const [auth, setAuth] = React.useState(false);
   const [anchorEl, setAnchorEl] = React.useState(null);
   const open = Boolean(anchorEl);
+
+  emitter.addListener('isLogin', () => {
+    setAuth(true)
+  })
 
   function handleMenu(event) {
     setAnchorEl(event.currentTarget);
@@ -33,8 +26,15 @@ export default function MenuAppBar() {
     setAnchorEl(null);
   }
 
+  function handleLogOut () {
+    handleClose()
+    setAuth(false)
+    localStorage.clear();
+    props.history.push('/login')
+  }
+
   return (
-      <AppBar position="static mb-5">
+      <AppBar position="static">
         <Toolbar className='d-flex justify-content-between'>
             <Link to='/'>
                 <h5 
@@ -71,7 +71,7 @@ export default function MenuAppBar() {
                 onClose={handleClose}
               >
                 <MenuItem onClick={handleClose}>Profile</MenuItem>
-                <MenuItem onClick={handleClose}>My account</MenuItem>
+                <MenuItem onClick={handleLogOut}>Log Out</MenuItem>
               </Menu>
             </div>
           ): (
