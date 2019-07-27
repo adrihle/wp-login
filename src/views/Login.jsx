@@ -36,6 +36,17 @@ const Fields = posed.div({
     exit: { x: 100, opacity: 0 }
 })
 
+const uploadUserStore = (data) => {
+    localStorage.setItem('userName', data.UserName)
+    localStorage.setItem('firstName', data.FirstName)
+    localStorage.setItem('lastName', data.LastName)
+    localStorage.setItem('email', data.Email)
+    localStorage.setItem('userId', data.UserId)
+    localStorage.setItem('creditAmount', data.CreditAmount)
+    localStorage.setItem('since', data.Since)
+    localStorage.setItem('urlAvatar', data.ProfilePhoto)
+}
+
 export default function Login(props) {
     const classes = useStyles()
     const input = useRef()
@@ -50,7 +61,6 @@ export default function Login(props) {
         setValues({ ...values, [input]: event.target.value })
     }
 
-    
     const handleClick = async () => {
         const { name, password } = values
         const loginData = {
@@ -59,23 +69,28 @@ export default function Login(props) {
         }
         setLoading(true)
         await axios.post(`${url.siteUrl}/wp-json/jwt-auth/v1/token`, loginData)
-            .then( res => {
+            .then( async res => {
                 if ( undefined === res.data.token ){
                     setValues({ ...values, err: res.data.message })
                     setLoading(false)
-                    console.log('algo fue mal')
+                    console.log('Fething token user failed')
                     return
                 }
-
-                localStorage.setItem('userName', res.data.user_display_name)
-                setLoading(false)
-                props.history.push('/')
-                emitter.emit('isLogin')
+                localStorage.setItem('token', res.data.token)
+                await axios.post('http://localhost:4000/user/profileData', { user_nicename: res.data.user_nicename })
+                    .then( res => {
+                        console.log(res.data)
+                        uploadUserStore(res.data)
+                        setLoading(false)
+                        props.history.push('/')
+                        emitter.emit('isLogin')
+                    })
             })
             .catch( err => {
                 setAlert(true)
             })
     }
+    
 
     const handleAlert = () => {
         setValues({...values,

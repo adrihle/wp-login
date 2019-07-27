@@ -25,20 +25,15 @@ app.use(cors())
 //setup mysql connection
 const pool = mysql.createPool(database)
 
-// deploying
-// //auth user
-// const queryAuthUser = 'SELECT user_pass FROM wp_users WHERE user_login = ?'
+//fetching user id
+const queryGetUserId = 'SELECT ID, user_registered FROM wp_users WHERE user_nicename = ?'
 
-// app.post('/auth', async (req, res) => {
-//     const { username, password } = req.body
-//     const user = {
-//         username,
-//         password: crypto.createHash('md5').update(password).digest('hex')
-//     }
-//     await pool.query(queryAuthUser, [username], (err, rows) => {
-//         console.log(rows[0].user_pass, user.password)
-//     })
-// })
+app.post('/userID', async (req, res) => {
+    const { user_nicename } = req.body
+    await pool.query(queryGetUserId, [user_nicename], (err, rows) => {
+        console.log(rows[0])
+    })
+})
 
 //fetching user info
 const queryGetProfilePhoto = 'SELECT meta_value FROM wp_usermeta WHERE user_id = ? AND meta_key = "profile_photo"'
@@ -65,26 +60,33 @@ function mysqlqueries(query, user_id){
 }
 
 app.post('/user/profileData', async (req, res) => {
+    const { user_nicename } = req.body
 
-    const { user_id } = req.body
-    var query_arr = [
-        mysqlqueries(queryGetFirstName, user_id),
-        mysqlqueries(queryGetLastName, user_id),
-        mysqlqueries(queryGetProfilePhoto, user_id),
-        mysqlqueries(queryGetCreditAmount, user_id),
-        mysqlqueries(queryGetUserEmail, user_id)
-    ]
+    await pool.query(queryGetUserId, [user_nicename], (err, rows) => {
 
-    const sending = (result) => {
-        const userData = {
-            FirstName: result[0],
-            LastName: result[1],
-            ProfilePhoto: result[2],
-            CreditAmount: result[3],
-            Email: result[4]
+        const sending = (result) => {
+            const userData = {
+                FirstName: result[0],
+                LastName: result[1],
+                ProfilePhoto: result[2],
+                CreditAmount: result[3],
+                Email: result[4],
+                UserId: rows[0].ID,
+                Since: rows[0].user_registered,
+                UserName: user_nicename
+            }
+            res.send(userData)
         }
-        res.send(userData)
-    }
 
-    Promise.all(query_arr).then(sending)
+        const user_id = rows[0].ID
+        var query_arr = [
+            mysqlqueries(queryGetFirstName, user_id),
+            mysqlqueries(queryGetLastName, user_id),
+            mysqlqueries(queryGetProfilePhoto, user_id),
+            mysqlqueries(queryGetCreditAmount, user_id),
+            mysqlqueries(queryGetUserEmail, user_id),
+            mysqlqueries(queryGetUserId, user_nicename)
+        ]
+        Promise.all(query_arr).then(sending)
+    })
 })

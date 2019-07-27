@@ -1,5 +1,6 @@
 import React from 'react'
 import posed from 'react-pose'
+import ProfileCard from '../components/ProfileCard'
 
 const Container = posed.div({
     enter: { staggerChildren: 50 }
@@ -19,7 +20,7 @@ export default function Dashboard() {
         <Container>
             <Fields>
                 {userName!==null ? 
-                    (<h3 className='text-white p-3'>Welcome {userName}</h3>)
+                    (<ProfileCard />)
                     :
                     (<h3 className='text-white p-3'>Dashboard</h3>)}
             </Fields>

@@ -1,18 +1,45 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import AppBar from '@material-ui/core/AppBar';
 import Toolbar from '@material-ui/core/Toolbar';
 import IconButton from '@material-ui/core/IconButton';
-import AccountCircle from '@material-ui/icons/AccountCircle';
 import MenuItem from '@material-ui/core/MenuItem';
+import Avatar from '@material-ui/core/Avatar';
+import { makeStyles } from '@material-ui/core/styles'
 import Menu from '@material-ui/core/Menu';
 import { Link } from 'react-router-dom'
 var emitter = require('../config/global_emitter')
 
+const useStyles = makeStyles({
+  avatar: {
+    width: 60,
+    height: 60,
+    boxShadow: '10px 10px rgba(0,0,0,0.7)',
+    MozBoxShadow: '10px 10px rgba(0,0,0,0.7)',
+    WebkitBoxShadow: '10px 10px rgba(0,0,0,0.7)',
+  },
+  box: {
+    marginRight: -10
+  },
+  popupMenu: {
+    marginTop: 40
+  }
+})
+
 
 export default function MenuAppBar(props) {
+  const classes = useStyles()
   const [auth, setAuth] = React.useState(false);
   const [anchorEl, setAnchorEl] = React.useState(null);
   const open = Boolean(anchorEl);
+
+  useEffect(() => {
+    const token = localStorage.getItem('urlAvatar')
+    if ( token === null ){
+      setAuth(false)
+    }else{
+      setAuth(true)
+    }
+  },[])
 
   emitter.addListener('isLogin', () => {
     setAuth(true)
@@ -49,10 +76,11 @@ export default function MenuAppBar(props) {
                 aria-label="account of current user"
                 aria-controls="menu-appbar"
                 aria-haspopup="true"
+                className={classes.box}
                 onClick={handleMenu}
                 color="inherit"
               >
-                <AccountCircle />
+                <Avatar alt="Avatar" src={localStorage.getItem('urlAvatar')} className={classes.bigAvatar} />
               </IconButton>
               {/* dropdown menu */}
               <Menu
@@ -69,6 +97,7 @@ export default function MenuAppBar(props) {
                 }}
                 open={open}
                 onClose={handleClose}
+                className={classes.popupMenu}
               >
                 <MenuItem onClick={handleClose}>Profile</MenuItem>
                 <MenuItem onClick={handleLogOut}>Log Out</MenuItem>
@@ -80,7 +109,7 @@ export default function MenuAppBar(props) {
             component={Link}
             color="inherit"
             style={{ textDecoration: 'none' }}>
-                <i className="fa fa-sign-in" aria-hidden="true"/>
+                <i className="fas fa-sign-in-alt"></i>
             </IconButton>
           )}
         </Toolbar>
