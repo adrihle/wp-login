@@ -5,8 +5,6 @@ const bodyParser = require('body-parser')
 const cors = require('cors')
 //config dependencies
 const { database } = require('../config/keys')
-const crypto = require('crypto')
-const hasher = require('wordpress-hash-node')
 
 //setup backend server
 const app = express()
