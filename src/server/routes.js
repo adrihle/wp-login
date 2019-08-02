@@ -88,3 +88,64 @@ app.post('/user/profileData', async (req, res) => {
         Promise.all(query_arr).then(sending)
     })
 })
+
+//fetching tournament info
+const getTournaments = 'SELECT ID FROM wp_posts WHERE post_type = "tournament"'
+const getTournamentGame = 'SELECT meta_value FROM wp_postmeta WHERE meta_key = "tournament_game" AND post_id = ?'
+
+
+function getTour () {
+    return new Promise((resolve, reject) => {
+        try{
+            pool.query(getTournaments, (err, rows) => {
+                if (err) {
+                    return reject(err)
+                } else {
+                    return resolve(rows)
+                }
+            })
+        }catch(err){
+            console.log(err)
+        }
+    })
+}
+
+function getTourName (id){
+    return new Promise((resolve, reject) => {
+        try{
+            pool.query(getTournamentGame, [id], (err, rows) => {
+                if (err) {
+                    return reject(err)
+                }else {
+                    return resolve(rows[0].meta_value)
+                }
+            })
+        }catch(err){
+            console.log(err)
+        }
+    })
+}
+
+async function cArr (rows){
+    let arr = []
+    for (let i=0; i<rows.length; i++){
+        const data = {
+            id: rows[i].ID,
+            name: await getTourName(rows[i].ID)
+        }
+        arr[i] = data
+    }
+    return arr
+}
+
+
+
+app.get('/tournaments', (req, res) => {
+
+    function send(data){
+        res.send(data)
+    }
+
+    getTour().then(cArr).then(send)
+})
+
