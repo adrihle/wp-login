@@ -5,6 +5,8 @@ const bodyParser = require('body-parser')
 const cors = require('cors')
 //config dependencies
 const { database } = require('../config/keys')
+var unserialize = require('php-unserialize');
+var serialize = require('js-php-serialize')
 
 //setup backend server
 const app = express()
@@ -89,99 +91,13 @@ app.post('/user/profileData', async (req, res) => {
     })
 })
 
-//fetching tournament info
-const getTournaments = 'SELECT ID FROM wp_posts WHERE post_type = "tournament"'
-const getTournamentGameName = 'SELECT meta_value FROM wp_postmeta WHERE meta_key = "tournament_game" AND post_id = ?'
-const getTournamentDate = 'SELECT meta_value FROM wp_postmeta WHERE meta_key = "tournament_starts" AND post_id = ?'
-const getTournamentMaxPart = 'SELECT meta_value FROM wp_postmeta WHERE meta_key = "tournament_max_participants" AND post_id = ?'
-const getTournamentPlataform = 'SELECT meta_value FROM wp_postmeta WHERE meta_key = "tournament_platform" AND post_id = ?'
-const getTournamentPrizes = 'SELECT meta_value FROM wp_postmeta WHERE meta_key = "tournament_prizes" AND post_id = ?'
-const getTournamentCompetitors = 'SELECT meta_value FROM wp_postmeta WHERE meta_key = "tournament_competitors" AND post_id = ?'
-
-function mysqlqueriesTournament(query, id){
-    return new Promise ((resolve, reject) => {
-        try{
-            pool.query(query, [id], (err, rows) => {
-                if (err){
-                    return reject(err)
-                }else{
-                    return resolve(rows[0].meta_value)
-                }
-            })
-        }catch(err){
-            console.log(err)
-        }
-    })
-}
-
-function getTour () {
-    return new Promise((resolve, reject) => {
-        try{
-            pool.query(getTournaments, (err, rows) => {
-                if (err) {
-                    return reject(err)
-                } else {
-                    return resolve(rows)
-                }
-            })
-        }catch(err){
-            console.log(err)
-        }
-    })
-}
-
-function getTourName (id){
-    return new Promise((resolve, reject) => {
-        try{
-            pool.query(getTournamentGameName, [id], (err, rows) => {
-                if (err) {
-                    return reject(err)
-                }else {
-                    return resolve(rows[0].meta_value)
-                }
-            })
-        }catch(err){
-            console.log(err)
-        }
-    })
-}
-
-async function cArr1 (rows, name){
-    let arr = []
-    let cont = 0
-    for (let i=0; i<rows.length; i++){
-        const data = {
-            id: rows[i].ID,
-            name: await mysqlqueriesTournament(getTournamentGameName, rows[i].ID),
-            date: await mysqlqueriesTournament(getTournamentDate, rows[i].ID),
-            maxPart: await mysqlqueriesTournament(getTournamentMaxPart, rows[i].ID),
-            plataform: await mysqlqueriesTournament(getTournamentPlataform, rows[i].ID),
-            prizes: await mysqlqueriesTournament(getTournamentPrizes, rows[i].ID),
-            competitors: await mysqlqueriesTournament(getTournamentCompetitors, rows[i].ID)
-            
-        }
-        if (data.name === name){
-            arr[cont] = data
-            cont ++
-        }
-    }
-    return arr
-}
-
-app.post('/tournaments', (req, res) => {
-    let { gameName } = req.body
-
-    function send(data){
-        res.send(data)
-    }
-
-    getTour().then(async(resp) => {return cArr1(resp, gameName)}).then(send)
-})
-
-
 //fetching tournaments info v.2 (70% more faster)
 const getTourIdByName = 'SELECT post_id FROM wp_postmeta WHERE meta_value = ?'
 const getTourDataById = 'SELECT meta_key, meta_value FROM wp_postmeta WHERE post_id = ?'
+const getTourCompetitors = 'SELECT meta_value FROM wp_postmeta WHERE post_id = ? AND meta_key = "tournament_competitors"'
+const getTourCompCache = 'SELECT meta_value FROM wp_postmeta WHERE post_id = ? AND meta_key = "participant_cache"'
+const updateTourParticipants = 'UPDATE wp_postmeta SET meta_value = ? WHERE meta_key = "tournament_competitors" AND post_id = ?'
+const updateTourPartCache = 'UPDATE wp_postmeta SET meta_value = ? WHERE meta_key = "participant_cache" AND post_id = ?'
 
 function tourID (gameName) {
     return new Promise ((resolve, reject) => {
@@ -236,17 +152,15 @@ async function switchTourInfo(data, info){
                 break
             }
             case "tournament_prizes": {
-                data.prizes = info[i].meta_value
+                data.prizes = unserialize.unserialize(info[i].meta_value)
                 break
             }
             case "tournament_competitors": {
-                data.competitors = info[i].meta_value
+                let unserializedParticipants = await unseralizedCompetitors(unserialize.unserialize(info[i].meta_value))
+                data.competitors = unserializedParticipants
                 break
             }
-            default: {
-                
-                break
-            }
+            default: {break}
         }
     }
     return data
@@ -266,7 +180,31 @@ async function cArr (rows){
     return arr
 }
 
-app.post('/tournaments2', async (req, res) => {
+//serialized method for the own tournament property (competitors) for upload to db
+async function serializedCompetitors(competitors){
+    let participants = {}
+    for (let i=0; i<competitors.length; i++){
+        const prop = `${competitors[i].user}`
+        participants[`${competitors[i].user}`] = prop
+    }
+    return participants
+}
+
+//deserialized function for transform db tournament competitors php data to own js tournament property (competitors)
+async function unseralizedCompetitors(competitors){
+    let participants = []
+        
+    for (var key in competitors){
+        let user = {}
+        if (competitors.hasOwnProperty(key)){
+            user.user = competitors[key]
+            participants.push(user)
+        }
+    }
+    return participants
+}
+
+app.post('/tournaments', async (req, res) => {
     let { gameName } = req.body
 
     function send (rows){
@@ -275,4 +213,74 @@ app.post('/tournaments2', async (req, res) => {
 
     tourID(gameName).then(cArr).then(send)
 })
+
+function pushCompetitors(competitors, id, query){
+    return new Promise ((resolve, reject) => {
+        try{
+            pool.query(query, [competitors, id], (err)=>{
+                if (err){
+                    return reject(err)
+                }else{
+                    return resolve('competitors updated correctly')
+                }
+            })
+        }catch(err){
+            console.log(err)
+        }
+    })
+}
+
+async function updateCompetitors(competitor, id) {
+    let competitors = await mysqlqueries(getTourCompetitors, id)
+    let unseCompetitors = await unseralizedCompetitors(unserialize.unserialize(competitors))
+    const ob = {
+        user: competitor
+    }
+    unseCompetitors.push(ob)
+    let seCompetitors = await serialize.serialize(await serializedCompetitors(unseCompetitors))
+
+    return seCompetitors
+}
+
+async function serializedCacheCompetitors(cache, participantId, participantName){
+    Object.size = function(obj) {
+        var size = 0, key;
+        for (key in obj) {
+            if (obj.hasOwnProperty(key)) size++;
+        }
+        return size;
+    };
+    const newParticipant = {
+        id: participantId,
+        seed: Object.size(cache) + 1,
+        name: participantName,
+        url: `http://a2wgames.com/members/${participantName}/`
+    }
+
+    cache[`${participantId}`] = newParticipant
+
+    return serialize.serialize(cache)
+}
+
+app.post('/tournaments/addCompetitor', async (req, res) => {
+    const { tournamentID, competitorsID, competitorName } = req.body
+    function send (a){
+        res.send(a)
+    }
+    updateCompetitors(competitorsID, tournamentID).then(async(resp) => {
+        return pushCompetitors(resp, tournamentID, updateTourParticipants)
+    })
+    mysqlqueries(getTourCompCache, tournamentID).then(async(resp) => {
+        let cache = unserialize.unserialize(resp)
+        return cache
+    }).then(async(cache) => {
+        return serializedCacheCompetitors(cache, competitorsID, competitorName)
+    }).then((a) => {
+        return pushCompetitors(a, tournamentID, updateTourPartCache)
+    }).then(send)
+
+})
+
+
+
 
