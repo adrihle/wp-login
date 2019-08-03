@@ -91,8 +91,28 @@ app.post('/user/profileData', async (req, res) => {
 
 //fetching tournament info
 const getTournaments = 'SELECT ID FROM wp_posts WHERE post_type = "tournament"'
-const getTournamentGame = 'SELECT meta_value FROM wp_postmeta WHERE meta_key = "tournament_game" AND post_id = ?'
+const getTournamentGameName = 'SELECT meta_value FROM wp_postmeta WHERE meta_key = "tournament_game" AND post_id = ?'
+const getTournamentDate = 'SELECT meta_value FROM wp_postmeta WHERE meta_key = "tournament_starts" AND post_id = ?'
+const getTournamentMaxPart = 'SELECT meta_value FROM wp_postmeta WHERE meta_key = "tournament_max_participants" AND post_id = ?'
+const getTournamentPlataform = 'SELECT meta_value FROM wp_postmeta WHERE meta_key = "tournament_platform" AND post_id = ?'
+const getTournamentPrizes = 'SELECT meta_value FROM wp_postmeta WHERE meta_key = "tournament_prizes" AND post_id = ?'
+const getTournamentCompetitors = 'SELECT meta_value FROM wp_postmeta WHERE meta_key = "tournament_competitors" AND post_id = ?'
 
+function mysqlqueriesTournament(query, id){
+    return new Promise ((resolve, reject) => {
+        try{
+            pool.query(query, [id], (err, rows) => {
+                if (err){
+                    return reject(err)
+                }else{
+                    return resolve(rows[0].meta_value)
+                }
+            })
+        }catch(err){
+            console.log(err)
+        }
+    })
+}
 
 function getTour () {
     return new Promise((resolve, reject) => {
@@ -113,7 +133,7 @@ function getTour () {
 function getTourName (id){
     return new Promise((resolve, reject) => {
         try{
-            pool.query(getTournamentGame, [id], (err, rows) => {
+            pool.query(getTournamentGameName, [id], (err, rows) => {
                 if (err) {
                     return reject(err)
                 }else {
@@ -126,26 +146,133 @@ function getTourName (id){
     })
 }
 
-async function cArr (rows){
+async function cArr1 (rows, name){
     let arr = []
+    let cont = 0
     for (let i=0; i<rows.length; i++){
         const data = {
             id: rows[i].ID,
-            name: await getTourName(rows[i].ID)
+            name: await mysqlqueriesTournament(getTournamentGameName, rows[i].ID),
+            date: await mysqlqueriesTournament(getTournamentDate, rows[i].ID),
+            maxPart: await mysqlqueriesTournament(getTournamentMaxPart, rows[i].ID),
+            plataform: await mysqlqueriesTournament(getTournamentPlataform, rows[i].ID),
+            prizes: await mysqlqueriesTournament(getTournamentPrizes, rows[i].ID),
+            competitors: await mysqlqueriesTournament(getTournamentCompetitors, rows[i].ID)
+            
         }
-        arr[i] = data
+        if (data.name === name){
+            arr[cont] = data
+            cont ++
+        }
     }
     return arr
 }
 
-
-
-app.get('/tournaments', (req, res) => {
+app.post('/tournaments', (req, res) => {
+    let { gameName } = req.body
 
     function send(data){
         res.send(data)
     }
 
-    getTour().then(cArr).then(send)
+    getTour().then(async(resp) => {return cArr1(resp, gameName)}).then(send)
+})
+
+
+//fetching tournaments info v.2 (70% more faster)
+const getTourIdByName = 'SELECT post_id FROM wp_postmeta WHERE meta_value = ?'
+const getTourDataById = 'SELECT meta_key, meta_value FROM wp_postmeta WHERE post_id = ?'
+
+function tourID (gameName) {
+    return new Promise ((resolve, reject) => {
+        try{
+            pool.query(getTourIdByName, [gameName], (err, rows) => {
+                if (err){
+                    return reject(err)
+                }else{
+                    return resolve(rows)
+                }
+            })
+
+        }catch(err){
+            console.log(err)
+        }
+    })
+}
+
+function getTourData(id){
+    return new Promise ((resolve, reject) => {
+        try{
+            pool.query(getTourDataById, [id], (err, rows) => {
+                if (err){
+                    return reject(err)
+                }else{
+                    return resolve(rows)
+                }
+            })
+        }catch(err){
+            console.log(err)
+        }
+    })
+}
+
+async function switchTourInfo(data, info){
+    for (let i=0; i<info.length; i++){
+        switch(info[i].meta_key){
+            case "tournament_game": {
+                data.game = info[i].meta_value
+                break
+            }
+            case "tournament_starts": {
+                data.date = info[i].meta_value
+                break
+            }
+            case "tournament_max_participants": {
+                data.maxPart = info[i].meta_value
+                break
+            }
+            case "tournament_platform": {
+                data.plataform = info[i].meta_value
+                break
+            }
+            case "tournament_prizes": {
+                data.prizes = info[i].meta_value
+                break
+            }
+            case "tournament_competitors": {
+                data.competitors = info[i].meta_value
+                break
+            }
+            default: {
+                
+                break
+            }
+        }
+    }
+    return data
+}
+
+async function cArr (rows){
+    let arr = []
+    for (let i=0; i<rows.length; i++){
+        const data = {
+            id: rows[i].post_id
+        }
+        const a = await getTourData(rows[i].post_id).then(async(resp) => {
+            return switchTourInfo(data, resp)
+        })
+        arr[i] = a
+    }
+    return arr
+}
+
+app.post('/tournaments2', async (req, res) => {
+    let { gameName } = req.body
+
+    function send (rows){
+        res.send(rows)
+    }
+
+    tourID(gameName).then(cArr).then(send)
 })
 
